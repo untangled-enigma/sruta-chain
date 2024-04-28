@@ -7,25 +7,36 @@ export class MessageVerificationInput extends Struct({
     root: Field
   }){}
 
-export const messagesMap = new MerkleMap();
+export const accountsMap = new MerkleMap();
+
+interface GamePointConfig {
+    admin: PublicKey;
+}
+
 
 @runtimeModule()
-export class GamePoints extends RuntimeModule<Record<string, never>>  {
+export class GamePoints extends RuntimeModule<GamePointConfig>  {
     @state() public accountsRoot = State.from<Field>(Field);
-    @state() public admin = State.from<PublicKey>(PublicKey);
 
     @runtimeMethod()
     public updatePoints(
        witness: MerkleMapWitness,
+       accountNo: Field,
        valueBefore: Field,
        valueAfter: Field
     ): void {
-        //TODO: root set logic
+        const [root, key] = witness.computeRootAndKey(valueBefore)
+        assert(this.accountsRoot.get().value.equals(root), "Root mismatch" )
+        assert(accountNo.equals(key), "Key mismatch" )
+
+        const [newRoot,] = witness.computeRootAndKey(valueAfter)
+        this.accountsRoot.set(newRoot)
     }
 
     @runtimeMethod()
     public addPlayer(root:Field):void{
-        assert( this.admin.get().value.equals(this.transaction.sender.value), "only admin call this")
+        //TODO: Add proof to check for older values
+        assert(this.config.admin.equals(this.transaction.sender.value), "only admin call this")
         this.accountsRoot.set(root)
     }
 }
